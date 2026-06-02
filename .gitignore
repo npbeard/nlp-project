@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environments
+.env
+.venv
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data — raw files are not committed; only processed artifacts are
+data/raw/
+data/cache/
+*.csv
+*.jsonl
+*.parquet
+*.pkl
+
+# Secrets (Reddit API credentials etc.)
+.env
+*.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model checkpoints (large binaries)
+checkpoints/
+*.pt
+*.bin
+*.safetensors
