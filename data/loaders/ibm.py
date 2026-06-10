@@ -6,13 +6,23 @@ HuggingFace: ibm/argument_quality_ranking_30k
 
 We map this to the unified schema:
   - topic → Debate with a single claim (the motion)
-  - argument → Argument of type 'premise' attached to that claim
+  - stance_WA = 1  → premise      (argument supports the topic)
+  - stance_WA = -1 → counter_claim (argument opposes the topic)
+  - WA < 0.3       → unknown      (very low quality / unclear)
   - WA (weighted average quality) stored in metadata
 """
 
 from typing import List, Dict
 
 from data.schema import Argument, Debate
+
+_UNKNOWN_QUALITY_THRESHOLD = 0.3
+
+
+def _arg_type(stance_wa: int, quality: float) -> str:
+    if quality < _UNKNOWN_QUALITY_THRESHOLD:
+        return "unknown"
+    return "premise" if stance_wa == 1 else "counter_claim"
 
 
 def load_ibm(split: str = "train") -> List[Debate]:
@@ -40,15 +50,15 @@ def load_ibm(split: str = "train") -> List[Debate]:
             text=topic,
             arg_type="claim",
         )
-        premises = [
+        arguments = [
             Argument(
                 id=f"{topic_id}__{i}",
                 text=row["argument"],
-                arg_type="premise",
+                arg_type=_arg_type(row["stance_WA"], row["WA"]),
                 parent_id=claim.id,
                 metadata={
-                    "quality_score": row.get("WA"),
-                    "stance": row.get("stance"),
+                    "quality_score": row["WA"],
+                    "stance_wa": row["stance_WA"],
                 },
             )
             for i, row in enumerate(rows)
@@ -58,7 +68,7 @@ def load_ibm(split: str = "train") -> List[Debate]:
                 id=topic_id,
                 title=topic,
                 source="ibm",
-                arguments=[claim] + premises,
+                arguments=[claim] + arguments,
             )
         )
     return debates

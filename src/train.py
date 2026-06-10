@@ -6,41 +6,38 @@ import os
 from collections import Counter
 from pathlib import Path
 
-import torch
-from torch.utils.data import DataLoader, random_split
-from torch.optim import AdamW
-from transformers import RobertaTokenizerFast, get_linear_schedule_with_warmup
-from sklearn.metrics import f1_score, accuracy_score
-from tqdm import tqdm
-
 from data import load_ibm, clean_debates
-from .dataset import ArgumentDataset, NUM_LABELS
-from .model import MODEL_NAME, build_model
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+NUM_LABELS = 4
 
 
-def _class_weights(dataset: ArgumentDataset) -> torch.Tensor:
-    """Inverse-frequency weights so rare labels (counter_claim, unknown) aren't ignored."""
+def _class_weights(dataset, device):
+    """Inverse-frequency weights so rare labels aren't ignored."""
+    import torch
     counts = Counter(ex["label"] for ex in dataset.examples)
     total = sum(counts.values())
     weights = torch.ones(NUM_LABELS)
     for label_id, count in counts.items():
         weights[label_id] = total / (NUM_LABELS * count)
-    return weights
+    return weights.to(device)
 
 
-def evaluate(model, loader) -> tuple[float, float, float]:
+def evaluate(model, loader, device):
+    import torch
+    from sklearn.metrics import f1_score, accuracy_score
     model.eval()
     all_preds, all_labels = [], []
     total_loss = 0.0
     loss_fn = torch.nn.CrossEntropyLoss()
     with torch.no_grad():
         for batch in loader:
-            input_ids = batch["input_ids"].to(DEVICE)
-            attention_mask = batch["attention_mask"].to(DEVICE)
-            labels = batch["label"].to(DEVICE)
-            logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            labels = batch["label"].to(device)
+            logits = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+            ).logits
             total_loss += loss_fn(logits, labels).item()
             all_preds.extend(logits.argmax(dim=-1).cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
@@ -61,7 +58,7 @@ def train(
 ) -> str:
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    print(f"Device: {DEVICE}")
+    # --- load data first, before touching CUDA ---
     print("Loading data...")
     debates = clean_debates(load_ibm("train"))
     print(f"  IBM Debater: {len(debates)} debates")
@@ -70,9 +67,37 @@ def train(
         from data import load_cmv
         cmv = clean_debates(load_cmv("train"))
         debates += cmv
-        print(f"  CMV: {len(cmv)} debates  (total: {len(debates)})")
-    except Exception:
-        print("  CMV not found — training on IBM only")
+        print(f"  CMV (file): {len(cmv)} debates  (total: {len(debates)})")
+    except FileNotFoundError:
+        try:
+            from data import scrape_cmv
+            print("  CMV file missing — scraping live from Reddit (limit=150)…")
+            cmv = clean_debates(scrape_cmv(limit=150, sort="top", time_filter="all"))
+            if cmv:
+                debates += cmv
+                print(f"  CMV (Reddit live): {len(cmv)} debates  (total: {len(debates)})")
+            else:
+                print("  Reddit scraper returned 0 debates — training on IBM only")
+        except Exception as e2:
+            print(f"  CMV not available ({e2.__class__.__name__}: {e2}) — training on IBM only")
+    except Exception as e:
+        print(f"  CMV load error ({e}) — training on IBM only")
+
+    # Heavy imports after data loading so torch/CUDA init
+    # doesn't compete with dataset memory usage
+    import torch
+    from torch.utils.data import DataLoader, random_split
+    from torch.optim import AdamW
+    from transformers import (
+        RobertaTokenizerFast,
+        get_linear_schedule_with_warmup,
+    )
+    from tqdm import tqdm
+    from .dataset import ArgumentDataset
+    from .model import MODEL_NAME, build_model
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Device: {device}")
 
     tokenizer = RobertaTokenizerFast.from_pretrained(MODEL_NAME)
     dataset = ArgumentDataset(debates, tokenizer, max_length)
@@ -84,11 +109,15 @@ def train(
         [len(dataset) - val_size, val_size],
         generator=torch.Generator().manual_seed(42),
     )
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0)
-    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=0)
+    train_loader = DataLoader(
+        train_set, batch_size=batch_size, shuffle=True, num_workers=0,
+    )
+    val_loader = DataLoader(
+        val_set, batch_size=batch_size, shuffle=False, num_workers=0,
+    )
 
-    model = build_model().to(DEVICE)
-    weights = _class_weights(dataset).to(DEVICE)
+    model = build_model().to(device)
+    weights = _class_weights(dataset, device)
     loss_fn = torch.nn.CrossEntropyLoss(weight=weights)
 
     optimizer = AdamW(model.parameters(), lr=lr, weight_decay=0.01)
@@ -106,12 +135,15 @@ def train(
         model.train()
         total_loss = 0.0
         for batch in tqdm(train_loader, desc=f"Epoch {epoch}/{epochs}"):
-            input_ids = batch["input_ids"].to(DEVICE)
-            attention_mask = batch["attention_mask"].to(DEVICE)
-            labels = batch["label"].to(DEVICE)
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            labels = batch["label"].to(device)
 
             optimizer.zero_grad()
-            logits = model(input_ids=input_ids, attention_mask=attention_mask).logits
+            logits = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+            ).logits
             loss = loss_fn(logits, labels)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -119,7 +151,7 @@ def train(
             scheduler.step()
             total_loss += loss.item()
 
-        val_loss, val_acc, val_f1 = evaluate(model, val_loader)
+        val_loss, val_acc, val_f1 = evaluate(model, val_loader, device)
         print(
             f"Epoch {epoch}:  "
             f"train_loss={total_loss / len(train_loader):.4f}  "
@@ -132,7 +164,10 @@ def train(
             best_f1 = val_f1
             model.save_pretrained(best_ckpt)
             tokenizer.save_pretrained(best_ckpt)
-            print(f"  → Saved best checkpoint (F1={best_f1:.4f}) to {best_ckpt}/")
+            print(
+                f"  → Saved best checkpoint "
+                f"(F1={best_f1:.4f}) to {best_ckpt}/"
+            )
 
     with open(os.path.join(output_dir, "train_config.json"), "w") as f:
         json.dump(
@@ -152,7 +187,7 @@ def train(
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="Train argument classifier. Run as: python -m src.train")
+    p = argparse.ArgumentParser()
     p.add_argument("--epochs", type=int, default=3)
     p.add_argument("--batch-size", type=int, default=16)
     p.add_argument("--lr", type=float, default=2e-5)
