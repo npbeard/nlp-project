@@ -21,7 +21,7 @@ def load_ibm(split: str = "train") -> List[Debate]:
     except ImportError:
         raise ImportError("Install 'datasets': pip install datasets")
 
-    ds = load_dataset("ibm/argument_quality_ranking_30k", split=split, trust_remote_code=True)
+    ds = load_dataset("ibm/argument_quality_ranking_30k", "argument_quality_ranking", split=split)
 
     # Group arguments by topic so each topic becomes one Debate
     topics: Dict[str, List[dict]] = {}
