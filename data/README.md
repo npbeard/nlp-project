@@ -17,7 +17,11 @@ arg   = Argument(id="1", text="Cats are independent.", arg_type="premise")
 
 ### CMV (offline)
 
-Download the Tan et al. 2016 dataset:
+Tan et al. 2016 "Winning Arguments" — r/changemyview threads with delta (∆)
+annotations marking comments that persuaded the OP. The delta signal is the
+closest thing to a ground-truth persuasion label in the wild.
+
+Download:
 ```bash
 mkdir -p data/raw/cmv
 curl -O https://chenhaot.com/data/cmv/cmv.tar.bz2
@@ -30,30 +34,28 @@ from data import load_cmv, clean_debates
 debates = clean_debates(load_cmv("train"))
 ```
 
-### IBM Debater (auto-download)
+### IBM Debater — Argument Quality (auto-download)
+
+~30k argument–topic pairs with human quality scores. Useful for training
+models to distinguish strong from weak arguments.
 
 ```python
 from data import load_ibm
-debates = load_ibm("train")  # downloads via HuggingFace datasets on first run
+debates = load_ibm("train")  # downloads via HuggingFace on first run
 ```
 
-### Live Reddit scraper
+### IBM Claim Stance (auto-download)
 
-Add credentials to `.env` (copy from `.env.example`):
-```
-REDDIT_CLIENT_ID=your_id
-REDDIT_CLIENT_SECRET=your_secret
-REDDIT_USER_AGENT=nlp-project/1.0 by your_username
-```
+~2,400 claim–topic pairs labeled PRO or CON. Directly provides claim vs.
+counter-claim ground truth — ideal for the classification component.
 
-Then:
 ```python
-from data import scrape_cmv, clean_debates
-debates = clean_debates(scrape_cmv(limit=100, sort="top", time_filter="month"))
+from data import load_claim_stance
+debates = load_claim_stance("train")
 ```
 
 ## Preprocessing
 
-`clean_debates()` applies Reddit-specific noise removal (quoted text, URLs,
-edit notes, user mentions) and drops arguments shorter than 5 tokens. Call it
-on any list of `Debate` objects before passing them downstream.
+`clean_debates()` removes Reddit-style noise (quoted text, URLs, edit notes,
+user mentions) and drops arguments shorter than 5 tokens. Call it on any
+list of `Debate` objects before passing them downstream.
