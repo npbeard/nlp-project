@@ -1,0 +1,7 @@
+{
+  "epochs": 1,
+  "batch_size": 8,
+  "lr": 2e-05,
+  "max_length": 256,
+  "best_val_f1": 0.8092623136138668
+}
