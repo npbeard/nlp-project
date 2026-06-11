@@ -70,16 +70,23 @@ def train(
         print(f"  CMV (file): {len(cmv)} debates  (total: {len(debates)})")
     except FileNotFoundError:
         try:
-            from data import scrape_cmv
-            print("  CMV file missing — scraping live from Reddit (limit=150)…")
-            cmv = clean_debates(scrape_cmv(limit=150, sort="top", time_filter="all"))
+            from data import load_convokit_cmv
+            print("  CMV file missing — loading ConvoKit corpus…")
+            cmv = clean_debates(load_convokit_cmv("train"))
             if cmv:
                 debates += cmv
-                print(f"  CMV (Reddit live): {len(cmv)} debates  (total: {len(debates)})")
+                print(
+                    f"  CMV (ConvoKit): {len(cmv)} debates"
+                    f"  (total: {len(debates)})"
+                )
             else:
-                print("  Reddit scraper returned 0 debates — training on IBM only")
+                print("  ConvoKit returned 0 debates — IBM only")
         except Exception as e2:
-            print(f"  CMV not available ({e2.__class__.__name__}: {e2}) — training on IBM only")
+            print(
+                f"  CMV not available"
+                f" ({e2.__class__.__name__}: {e2})"
+                f" — training on IBM only"
+            )
     except Exception as e:
         print(f"  CMV load error ({e}) — training on IBM only")
 
