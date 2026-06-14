@@ -1,7 +1,7 @@
 {
-  "epochs": 1,
+  "epochs": 3,
   "batch_size": 8,
   "lr": 2e-05,
   "max_length": 256,
-  "best_val_f1": 0.8116187557630061
+  "best_val_f1": 0.8170783740824297
 }
