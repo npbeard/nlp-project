@@ -42,6 +42,7 @@ Thumbs.db
 
 # Model checkpoints (large binaries)
 checkpoints/
+models/
 *.pt
 *.bin
 *.safetensors
