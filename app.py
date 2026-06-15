@@ -8,7 +8,7 @@ import torch
 from transformers import RobertaForSequenceClassification, RobertaTokenizerFast
 
 
-HF_CHECKPOINT = "Pengchong1113/argument-role-classifier"
+REMOTE_CHECKPOINT = "Pengchong1113/argument-role-classifier"
 LOCAL_CHECKPOINT = "models/best"
 LABELS = ["claim", "counter_claim", "premise", "unknown"]
 LABEL_DISPLAY = {
@@ -153,15 +153,17 @@ st.title("Argument Role Classifier")
 
 with st.sidebar:
     st.header("Model")
+    checkpoint_options = ["Remote", "Local"] if REMOTE_CHECKPOINT else ["Local"]
     model_location = st.radio(
         "Checkpoint source",
-        ["Hugging Face", "Local"],
+        checkpoint_options,
         index=0,
     )
     checkpoint = (
-        HF_CHECKPOINT if model_location == "Hugging Face" else LOCAL_CHECKPOINT
+        REMOTE_CHECKPOINT if model_location == "Remote" else LOCAL_CHECKPOINT
     )
-    st.code(checkpoint)
+    if model_location == "Local" and not Path(LOCAL_CHECKPOINT).exists():
+        st.info("Place local model files under models/best, or switch to Remote.")
 
 render_label_reference()
 
