@@ -46,3 +46,4 @@ models/
 *.pt
 *.bin
 *.safetensors
+models.zip
