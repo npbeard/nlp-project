@@ -37,19 +37,14 @@ from data import load_ibm
 debates = load_ibm("train")  # downloads via HuggingFace datasets on first run
 ```
 
-### Live Reddit scraper
+### IBM Claim Stance (auto-download)
 
-Add credentials to `.env` (copy from `.env.example`):
-```
-REDDIT_CLIENT_ID=your_id
-REDDIT_CLIENT_SECRET=your_secret
-REDDIT_USER_AGENT=nlp-project/1.0 by your_username
-```
+~2,400 claim–topic pairs labeled PRO or CON against debate motions.
+Directly provides claim vs. counter-claim ground truth.
 
-Then:
 ```python
-from data import scrape_cmv, clean_debates
-debates = clean_debates(scrape_cmv(limit=100, sort="top", time_filter="month"))
+from data import load_claim_stance
+debates = load_claim_stance("train")
 ```
 
 ## Preprocessing

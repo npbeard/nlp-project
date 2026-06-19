@@ -26,6 +26,8 @@ data/cache/
 *.jsonl
 *.parquet
 *.pkl
+!evaluation/custom_argument_eval.jsonl
+!evaluation/custom_argument_eval_predictions.csv
 
 # Secrets (Reddit API credentials etc.)
 .env

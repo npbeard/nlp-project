@@ -1,5 +1,5 @@
 from data.schema import Argument, Debate
-from data.loaders import load_cmv, load_convokit_cmv, load_ibm, scrape_cmv
+from data.loaders import load_cmv, load_convokit_cmv, load_ibm, load_claim_stance
 from data.preprocessing import clean_debates
 
 __all__ = [
@@ -8,6 +8,6 @@ __all__ = [
     "load_cmv",
     "load_convokit_cmv",
     "load_ibm",
-    "scrape_cmv",
+    "load_claim_stance",
     "clean_debates",
 ]

@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+import importlib.metadata
+from packaging.version import Version
+
+_tv = Version(importlib.metadata.version("transformers"))
+if _tv >= Version("5.0.0"):
+    raise RuntimeError(
+        f"transformers {_tv} is installed but this project requires <5.0.0. "
+        "Run: pip install transformers==4.57.6"
+    )
+
 from data.schema import Argument, Debate
 
 LABEL2ID = {"claim": 0, "counter_claim": 1, "premise": 2, "unknown": 3}
